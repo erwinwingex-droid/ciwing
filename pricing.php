@@ -1,704 +1,461 @@
 <?php
-include 'includes/config.php';
-include 'includes/auth.php';
-include 'includes/functions.php';
-include 'includes/header.php';
+include '../includes/auth.php';
+requireAdmin();
+include '../includes/functions.php';
 
+// Tambah promo baru
+if (isset($_POST['add_promo'])) {
+    $service_id = sanitize($_POST['service_id']);
+    $name = sanitize($_POST['name']);
+    $description = sanitize($_POST['description']);
+    $discount_type = sanitize($_POST['discount_type']);
+    $discount_value = sanitize($_POST['discount_value']);
+    $min_quantity = sanitize($_POST['min_quantity']);
+    $start_date = sanitize($_POST['start_date']);
+    $end_date = sanitize($_POST['end_date']);
+    $is_active = isset($_POST['is_active']) ? 1 : 0;
+
+    $stmt = $pdo->prepare("
+        INSERT INTO promotions (service_id, name, description, discount_type, discount_value, min_quantity, start_date, end_date, is_active) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    if ($stmt->execute([$service_id, $name, $description, $discount_type, $discount_value, $min_quantity, $start_date, $end_date, $is_active])) {
+        $success = "Promo berhasil ditambahkan!";
+    } else {
+        $error = "Gagal menambahkan promo!";
+    }
+}
+
+// Update promo
+if (isset($_POST['update_promo'])) {
+    $id = sanitize($_POST['id']);
+    $service_id = sanitize($_POST['service_id']);
+    $name = sanitize($_POST['name']);
+    $description = sanitize($_POST['description']);
+    $discount_type = sanitize($_POST['discount_type']);
+    $discount_value = sanitize($_POST['discount_value']);
+    $min_quantity = sanitize($_POST['min_quantity']);
+    $start_date = sanitize($_POST['start_date']);
+    $end_date = sanitize($_POST['end_date']);
+    $is_active = isset($_POST['is_active']) ? 1 : 0;
+
+    $stmt = $pdo->prepare("
+        UPDATE promotions SET service_id = ?, name = ?, description = ?, discount_type = ?, discount_value = ?, 
+        min_quantity = ?, start_date = ?, end_date = ?, is_active = ? WHERE id = ?
+    ");
+
+    if ($stmt->execute([$service_id, $name, $description, $discount_type, $discount_value, $min_quantity, $start_date, $end_date, $is_active, $id])) {
+        $success = "Promo berhasil diupdate!";
+    } else {
+        $error = "Gagal mengupdate promo!";
+    }
+}
+
+// Delete promo
+if (isset($_POST['delete_promo'])) {
+    $id = sanitize($_POST['id']);
+    $stmt = $pdo->prepare("DELETE FROM promotions WHERE id = ?");
+    if ($stmt->execute([$id])) {
+        $success = "Promo berhasil dihapus!";
+    } else {
+        $error = "Gagal menghapus promo!";
+    }
+}
+
+// Dapatkan semua promo (fix kolom)
+$stmt = $pdo->query("
+    SELECT p.*, s.name as service_name 
+    FROM promotions p 
+    LEFT JOIN services s ON p.service_id = s.id 
+    ORDER BY p.id DESC
+");
+$promotions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Dapatkan semua layanan untuk dropdown
 $services = getServices();
-$promotions = getActivePromotions();
 ?>
 
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <link rel="icon" href="/Adin-Laundry/assets/images/favicon.ico" type="image/x-icon">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Harga & Promo - Adin Laundry</title>
+    <title>Data Harga & Promo - Admin Adin Laundry</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../assets/css/admin.css">
+    <style>
+        /* reuse admin card/table styles from services.php for consistent admin UI */
+        .card {
+            border: none;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+            border-radius: .5rem;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
 
-    <!-- STYLE & FONT -->
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/navbar.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem 1.5rem;
+        }
+
+        .card-header h3 {
+            margin: 0;
+            font-weight: 600;
+            color: #2c3e50
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: .5rem
+        }
+
+        .form-control,
+        .form-select {
+            border: 1px solid #ced4da;
+            border-radius: .375rem;
+            padding: .5rem .75rem;
+            font-size: .875rem
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #86b7fe;
+            box-shadow: 0 0 0 .25rem rgba(13, 110, 253, .25)
+        }
+
+        .form-text {
+            font-size: .75rem;
+            color: #6c757d
+        }
+
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            padding: .5rem 1.5rem;
+            font-weight: 500
+        }
+
+        .btn-primary:hover {
+            background-color: #0b5ed7
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: .25rem .75rem;
+            border-radius: 50rem;
+            font-size: .75rem;
+            font-weight: 500
+        }
+
+        .status-active {
+            background-color: #d1e7dd;
+            color: #0f5132
+        }
+
+        .status-inactive {
+            background-color: #f8d7da;
+            color: #842029
+        }
+
+        .table thead th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            color: #495057;
+            font-weight: 600;
+            padding: .75rem 1rem
+        }
+
+        .table tbody td {
+            padding: .75rem 1rem;
+            vertical-align: middle;
+            border-top: 1px solid #e9ecef
+        }
+
+        @media (max-width:768px) {
+            .card-body {
+                padding: 1rem
+            }
+        }
+    </style>
 </head>
-<body>
+</body>
 
-<div class="modern-container">
-    <!-- HERO SECTION -->
-    <section class="hero-pricing animate__animated animate__fadeIn">
-        <div class="hero-content">
-            <h1 class="hero-title">
-                <span class="hero-highlight">Harga Terbaik</span> untuk Laundry Anda
-            </h1>
-            <p class="hero-subtitle">
-                Layanan premium dengan harga terjangkau. Dapatkan promo menarik setiap bulannya!
-            </p>
-            <div class="hero-badge">
-                <i class="fas fa-certificate"></i> Garansi Kepuasan 100%
-            </div>
-        </div>
-    </section>
+<?php include 'includes/header.php'; ?>
+<?php include 'sidebar.php'; ?>
 
-    <!-- PROMO SECTION -->
-    <section class="promo-section section-spacing">
-        <div class="section-header">
-            <h2 class="section-title">
-                <i class="fas fa-tags section-icon"></i>
-                Promo Spesial
-            </h2>
-            <p class="section-subtitle">Nikmati berbagai penawaran menarik untuk laundry Anda</p>
+<div class="main-content">
+    <div class="content-header mb-4">
+        <h1 class="h2 mb-2">Data Harga & Promo</h1>
+        <p class="text-muted">Kelola harga layanan dan promo</p>
+    </div>
+
+    <?php if (isset($success)): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <?php echo $success; ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-        
-        <div class="promo-grid">
-            <?php if (empty($promotions)): ?>
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-percent"></i>
+    <?php endif; ?>
+
+    <?php if (isset($error)): ?>
+        <div class="alert alert-error alert-dismissible fade show" role="alert">
+            <?php echo $error; ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
+    <!-- Card Tambah Promo -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="h5 mb-0">Tambah Promo Baru</h3>
+            <i class="bi bi-percent text-primary"></i>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="needs-validation" novalidate>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label for="service_id" class="form-label">Layanan</label>
+                        <select class="form-select" id="service_id" name="service_id">
+                            <option value="">Promo Umum (Semua Layanan)</option>
+                            <?php foreach ($services as $service): ?>
+                                <option value="<?php echo $service['id']; ?>"><?php echo htmlspecialchars($service['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
-                    <h3>Belum ada promo aktif</h3>
-                    <p>Silakan cek kembali nanti untuk promo-promo menarik kami</p>
+                    <div class="col-md-4">
+                        <label for="name" class="form-label">Nama Promo</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                        <div class="invalid-feedback">Harap isi nama promo.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="min_quantity" class="form-label">Minimal Quantity</label>
+                        <input type="number" class="form-control" id="min_quantity" name="min_quantity" value="1" min="1">
+                    </div>
                 </div>
-            <?php else: ?>
-                <?php foreach ($promotions as $promo): ?>
-                    <div class="promo-card animate__animated animate__fadeInUp">
-                        <div class="promo-badge">
-                            <span class="badge-text">HOT</span>
-                        </div>
-                        <div class="promo-header">
-                            <div class="promo-icon">
-                                <i class="fas fa-fire"></i>
-                            </div>
-                            <h3 class="promo-title"><?php echo $promo['name']; ?></h3>
-                        </div>
-                        <div class="promo-body">
-                            <p class="promo-desc"><?php echo $promo['description']; ?></p>
-                            
-                            <div class="promo-detail">
-                                <div class="detail-item">
-                                    <i class="fas fa-tag"></i>
-                                    <span class="detail-label">Diskon:</span>
-                                    <span class="detail-value promo-highlight">
-                                        <?php if ($promo['discount_type'] === 'percentage'): ?>
-                                            <?php echo $promo['discount_value']; ?>%
-                                        <?php else: ?>
-                                            Rp <?php echo number_format($promo['discount_value'], 0, ',', '.'); ?>
-                                        <?php endif; ?>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label for="description" class="form-label">Deskripsi Promo</label>
+                        <textarea class="form-control" id="description" name="description" rows="2" required></textarea>
+                        <div class="invalid-feedback">Harap isi deskripsi promo.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="discount_type" class="form-label">Jenis Diskon</label>
+                        <select class="form-select" id="discount_type" name="discount_type" required>
+                            <option value="percentage">Persentase (%)</option>
+                            <option value="fixed">Nominal (Rp)</option>
+                        </select>
+                        <label for="discount_value" class="form-label mt-3">Nilai Diskon</label>
+                        <input type="number" class="form-control" id="discount_value" name="discount_value" required min="0" step="0.01">
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label for="start_date" class="form-label">Tanggal Mulai</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="end_date" class="form-label">Tanggal Berakhir</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date">
+                    </div>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="is_active" value="1" id="is_active" checked>
+                    <label class="form-check-label" for="is_active">Aktif</label>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" name="add_promo" class="btn btn-primary">Tambah Promo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Card Daftar Promo -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="h5 mb-0">Daftar Promo</h3>
+            <span class="badge bg-primary rounded-pill"><?php echo count($promotions); ?> Promo</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nama Promo</th>
+                            <th>Layanan</th>
+                            <th>Diskon</th>
+                            <th>Min. Qty</th>
+                            <th>Periode</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($promotions as $promo): ?>
+                            <tr>
+                                <td>
+                                    <strong><?php echo htmlspecialchars($promo['name']); ?></strong>
+                                    <br><small><?php echo htmlspecialchars($promo['description']); ?></small>
+                                </td>
+                                <td><?php echo htmlspecialchars($promo['service_name'] ?: 'Semua Layanan'); ?></td>
+                                <td>
+                                    <?php if ($promo['discount_type'] === 'percentage'): ?>
+                                        <?php echo $promo['discount_value']; ?>%
+                                    <?php else: ?>
+                                        Rp <?php echo number_format($promo['discount_value'], 0, ',', '.'); ?>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?php echo $promo['min_quantity']; ?></td>
+                                <td>
+                                    <?php echo $promo['start_date'] ? date('d M Y', strtotime($promo['start_date'])) : '-'; ?>
+                                    <br>s/d<br>
+                                    <?php echo $promo['end_date'] ? date('d M Y', strtotime($promo['end_date'])) : '-'; ?>
+                                </td>
+                                <td>
+                                    <span class="status-badge <?php echo $promo['is_active'] ? 'status-active' : 'status-inactive'; ?>">
+                                        <?php echo $promo['is_active'] ? 'Aktif' : 'Nonaktif'; ?>
                                     </span>
-                                </div>
-                                
-                                <?php if ($promo['min_quantity'] > 1): ?>
-                                <div class="detail-item">
-                                    <i class="fas fa-shopping-basket"></i>
-                                    <span class="detail-label">Minimal:</span>
-                                    <span class="detail-value"><?php echo $promo['min_quantity']; ?> item</span>
-                                </div>
-                                <?php endif; ?>
-                                
-                                <?php if ($promo['service_name']): ?>
-                                <div class="detail-item">
-                                    <i class="fas fa-concierge-bell"></i>
-                                    <span class="detail-label">Layanan:</span>
-                                    <span class="detail-value"><?php echo $promo['service_name']; ?></span>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <a href="<?php echo isLoggedIn() ? 'customer/order.php' : 'login.php'; ?>" class="btn-promo">
-                                <i class="fas fa-bolt"></i> Ambil Promo Sekarang
-                            </a>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </section>
-
-    <!-- SERVICE SECTION -->
-    <section class="pricing-section section-spacing">
-        <div class="section-header">
-            <h2 class="section-title">
-                <i class="fas fa-list-alt section-icon"></i>
-                Paket Layanan Kami
-            </h2>
-            <p class="section-subtitle">Pilih layanan yang sesuai dengan kebutuhan Anda</p>
-        </div>
-        
-        <div class="pricing-grid">
-            <?php if (empty($services)): ?>
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-concierge-bell"></i>
-                    </div>
-                    <h3>Data layanan belum tersedia</h3>
-                    <p>Silakan hubungi admin untuk informasi lebih lanjut</p>
-                </div>
-            <?php else: ?>
-                <?php foreach ($services as $index => $service): ?>
-                    <div class="pricing-card animate__animated animate__fadeInUp" data-delay="<?php echo $index * 100; ?>">
-                        <div class="card-header">
-                            <div class="service-icon">
-                                <?php 
-                                    $icons = ['tshirt', 'blanket', 'wind', 'spray-can', 'soap'];
-                                    $icon = $icons[$index % count($icons)];
-                                ?>
-                                <i class="fas fa-<?php echo $icon; ?>"></i>
-                            </div>
-                            <h3 class="service-title"><?php echo $service['name']; ?></h3>
-                        </div>
-                        
-                        <div class="card-body">
-                            <p class="service-desc"><?php echo $service['description']; ?></p>
-                            
-                            <div class="service-features">
-                                <div class="feature">
-                                    <i class="fas fa-clock feature-icon"></i>
-                                    <span>Durasi: <strong><?php echo $service['duration']; ?></strong></span>
-                                </div>
-                                <div class="feature">
-                                    <i class="fas fa-star feature-icon"></i>
-                                    <span>Kualitas Premium</span>
-                                </div>
-                                <div class="feature">
-                                    <i class="fas fa-check feature-icon"></i>
-                                    <span>Bebas Pewangi</span>
-                                </div>
-                            </div>
-                            
-                            <div class="price-container">
-                                <div class="price-main">Rp <?php echo number_format($service['base_price'], 0, ',', '.'); ?></div>
-                                <div class="price-unit">/ kg</div>
-                            </div>
-                            
-                            <a href="<?php echo isLoggedIn() ? 'customer/order.php' : 'login.php'; ?>" class="btn-service">
-                                <i class="fas fa-shopping-cart"></i> Pesan Sekarang
-                            </a>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </section>
-
-    <!-- CTA SECTION -->
-    <section class="cta-section animate__animated animate__fadeIn">
-        <div class="cta-content">
-            <h2 class="cta-title">Siap Mencoba Layanan Kami?</h2>
-            <p class="cta-text">Pesan sekarang dan dapatkan pengalaman laundry terbaik</p>
-            <div class="cta-buttons">
-                <a href="<?php echo isLoggedIn() ? 'customer/order.php' : 'login.php'; ?>" class="btn-cta-primary">
-                    <i class="fas fa-calendar-check"></i> Buat Pesanan
-                </a>
-                <a href="contact.php" class="btn-cta-secondary">
-                    <i class="fas fa-phone-alt"></i> Hubungi Kami
-                </a>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1" onclick='editPromo(<?php echo htmlspecialchars(json_encode($promo)); ?>)' data-bs-toggle="tooltip" title="Edit Promo">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <form method="POST" style="display:inline-block;" onsubmit="return confirm('Hapus promo ini? Aksi ini tidak dapat dibatalkan.');">
+                                        <input type="hidden" name="id" value="<?php echo $promo['id']; ?>">
+                                        <button type="submit" name="delete_promo" class="btn btn-sm btn-outline-danger" title="Hapus Promo">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
-    </section>
+    </div>
 </div>
 
-<style>
-    :root {
-        --primary-color: #0E1F33;
-        --secondary-color: #FF5F0F;
-        --accent-color: #2A5CAA;
-        --light-color: #F8F9FA;
-        --dark-color: #212529;
-        --success-color: #28a745;
-        --warning-color: #ffc107;
-        --danger-color: #dc3545;
-        --gray-light: #e9ecef;
-        --gray-medium: #6c757d;
-        --shadow-light: 0 4px 12px rgba(0,0,0,0.08);
-        --shadow-medium: 0 8px 24px rgba(0,0,0,0.12);
-        --shadow-heavy: 0 12px 36px rgba(0,0,0,0.15);
-        --border-radius: 12px;
-        --border-radius-lg: 20px;
-        --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    }
-
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
-
-    body {
-        font-family: 'Poppins', sans-serif;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        color: var(--dark-color);
-        line-height: 1.6;
-    }
-
-    .modern-container {
-        max-width: 1400px;
-        margin: 100px auto 40px auto;
-        padding: 0 20px;
-    }
-
-    .section-spacing {
-        margin-bottom: 80px;
-    }
-
-    /* HERO SECTION */
-    .hero-pricing {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-        border-radius: var(--border-radius-lg);
-        padding: 60px 40px;
-        margin-bottom: 60px;
-        text-align: center;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .hero-pricing::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
-        background-size: cover;
-    }
-
-    .hero-content {
-        position: relative;
-        z-index: 2;
-    }
-
-    .hero-title {
-        color: white;
-        font-size: 2.8rem;
-        font-weight: 700;
-        margin-bottom: 15px;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .hero-highlight {
-        color: var(--secondary-color);
-        background: rgba(255, 255, 255, 0.1);
-        padding: 5px 15px;
-        border-radius: 50px;
-    }
-
-    .hero-subtitle {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 1.2rem;
-        max-width: 700px;
-        margin: 0 auto 25px;
-    }
-
-    .hero-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        background: rgba(255, 255, 255, 0.15);
-        color: white;
-        padding: 10px 25px;
-        border-radius: 50px;
-        font-weight: 500;
-        backdrop-filter: blur(10px);
-    }
-
-    /* SECTION HEADER */
-    .section-header {
-        text-align: center;
-        margin-bottom: 50px;
-    }
-
-    .section-title {
-        color: var(--primary-color);
-        font-size: 2.2rem;
-        font-weight: 700;
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 15px;
-    }
-
-    .section-icon {
-        color: var(--secondary-color);
-        font-size: 1.8rem;
-    }
-
-    .section-subtitle {
-        color: var(--gray-medium);
-        font-size: 1.1rem;
-        max-width: 600px;
-        margin: 0 auto;
-    }
-
-    /* GRID LAYOUT */
-    .promo-grid,
-    .pricing-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 30px;
-    }
-
-    @media (max-width: 768px) {
-        .promo-grid,
-        .pricing-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    /* PROMO CARD */
-    .promo-card {
-        background: white;
-        border-radius: var(--border-radius);
-        box-shadow: var(--shadow-light);
-        overflow: hidden;
-        transition: var(--transition);
-        position: relative;
-    }
-
-    .promo-card:hover {
-        transform: translateY(-10px);
-        box-shadow: var(--shadow-heavy);
-    }
-
-    .promo-badge {
-        position: absolute;
-        top: 20px;
-        right: -30px;
-        background: var(--danger-color);
-        color: white;
-        padding: 5px 40px;
-        transform: rotate(45deg);
-        font-weight: 600;
-        font-size: 0.9rem;
-        z-index: 2;
-    }
-
-    .promo-header {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-        padding: 30px;
-        text-align: center;
-        position: relative;
-    }
-
-    .promo-icon {
-        font-size: 3rem;
-        color: white;
-        margin-bottom: 15px;
-    }
-
-    .promo-title {
-        color: white;
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-
-    .promo-body {
-        padding: 30px;
-    }
-
-    .promo-desc {
-        color: var(--gray-medium);
-        margin-bottom: 25px;
-        line-height: 1.7;
-    }
-
-    .promo-detail {
-        background: var(--light-color);
-        border-radius: var(--border-radius);
-        padding: 20px;
-        margin-bottom: 25px;
-    }
-
-    .detail-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
-    }
-
-    .detail-item:last-child {
-        margin-bottom: 0;
-    }
-
-    .detail-item i {
-        color: var(--secondary-color);
-        width: 20px;
-        text-align: center;
-    }
-
-    .detail-label {
-        color: var(--dark-color);
-        font-weight: 500;
-        min-width: 80px;
-    }
-
-    .detail-value {
-        color: var(--primary-color);
-        font-weight: 600;
-    }
-
-    .promo-highlight {
-        color: var(--danger-color);
-        font-size: 1.1rem;
-    }
-
-    /* PRICING CARD */
-    .pricing-card {
-        background: white;
-        border-radius: var(--border-radius);
-        box-shadow: var(--shadow-light);
-        overflow: hidden;
-        transition: var(--transition);
-        display: flex;
-        flex-direction: column;
-    }
-
-    .pricing-card:hover {
-        transform: translateY(-10px);
-        box-shadow: var(--shadow-heavy);
-    }
-
-    .card-header {
-        background: linear-gradient(135deg, var(--primary-color) 0%, #1a365d 100%);
-        padding: 40px 30px;
-        text-align: center;
-    }
-
-    .service-icon {
-        font-size: 3.5rem;
-        color: var(--secondary-color);
-        margin-bottom: 20px;
-    }
-
-    .service-title {
-        color: white;
-        font-size: 1.6rem;
-        font-weight: 600;
-    }
-
-    .card-body {
-        padding: 30px;
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .service-desc {
-        color: var(--gray-medium);
-        margin-bottom: 25px;
-        line-height: 1.7;
-        flex-grow: 1;
-    }
-
-    .service-features {
-        margin-bottom: 25px;
-    }
-
-    .feature {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
-        padding: 12px;
-        background: var(--light-color);
-        border-radius: 8px;
-    }
-
-    .feature-icon {
-        color: var(--secondary-color);
-    }
-
-    .price-container {
-        display: flex;
-        align-items: baseline;
-        justify-content: center;
-        gap: 5px;
-        margin: 25px 0;
-    }
-
-    .price-main {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: var(--primary-color);
-    }
-
-    .price-unit {
-        color: var(--gray-medium);
-        font-size: 1rem;
-    }
-
-    /* BUTTONS */
-    .btn-promo,
-    .btn-service,
-    .btn-cta-primary,
-    .btn-cta-secondary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        padding: 14px 28px;
-        border-radius: 50px;
-        font-weight: 600;
-        text-decoration: none;
-        transition: var(--transition);
-        cursor: pointer;
-        border: none;
-        font-size: 1rem;
-        text-align: center;
-        width: 100%;
-    }
-
-    .btn-promo {
-        background: linear-gradient(135deg, var(--secondary-color) 0%, #ff7b47 100%);
-        color: white;
-    }
-
-    .btn-promo:hover {
-        background: linear-gradient(135deg, #e8550e 0%, #ff7b47 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(255, 95, 15, 0.3);
-    }
-
-    .btn-service {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-        color: white;
-    }
-
-    .btn-service:hover {
-        background: linear-gradient(135deg, #0c1a2b 0%, #244a8a 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(14, 31, 51, 0.3);
-    }
-
-    /* CTA SECTION */
-    .cta-section {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-        border-radius: var(--border-radius-lg);
-        padding: 60px 40px;
-        text-align: center;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .cta-section::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,100 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
-        background-size: cover;
-    }
-
-    .cta-content {
-        position: relative;
-        z-index: 2;
-    }
-
-    .cta-title {
-        color: white;
-        font-size: 2.2rem;
-        font-weight: 700;
-        margin-bottom: 15px;
-    }
-
-    .cta-text {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 1.1rem;
-        margin-bottom: 30px;
-        max-width: 600px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-
-    .cta-buttons {
-        display: flex;
-        gap: 20px;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-
-    .btn-cta-primary {
-        background: white;
-        color: var(--primary-color);
-        min-width: 200px;
-    }
-
-    .btn-cta-primary:hover {
-        background: var(--light-color);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3);
-    }
-
-    .btn-cta-secondary {
-        background: transparent;
-        color: white;
-        border: 2px solid white;
-        min-width: 200px;
-    }
-
-    .btn-cta-secondary:hover {
-        background: rgba(255, 255, 255, 0.1);
-        transform: translateY(-2px);
-    }
-
-    /* EMPTY STATE */
-    .empty-state {
-        grid-column: 1 / -1;
-        text-align: center;
-        padding: 60px 20px;
-        background: white;
-        border-radius: var(--border-radius);
-        box-shadow: var(--shadow-light);
-    }
-
-    .empty-icon {
-        font-size: 4rem;
-        color: var(--gray-light);
-        margin-bottom: 20px;
-    }
-
-    .empty-state h3 {
-        color: var(--dark-color);
-        margin-bottom: 10px;
-    }
-
-    .empty-state p {
-        color: var(--gray-medium);
-    }
-
-    /* ANIMATIONS */
-    .animate__animated {
-        animation-duration: 0.6s;
-    }
-</style>
-
+<!-- Modal Edit Promo (Bootstrap) -->
+<div class="modal fade" id="promoModal" tabindex="-1" aria-labelledby="promoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="promoModalLabel">Edit Promo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" id="promoForm" class="needs-validation" novalidate>
+                    <input type="hidden" name="id" id="edit_id">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="edit_service_id" class="form-label">Layanan</label>
+                            <select class="form-select" id="edit_service_id" name="service_id">
+                                <option value="">Promo Umum (Semua Layanan)</option>
+                                <?php foreach ($services as $service): ?>
+                                    <option value="<?php echo $service['id']; ?>"><?php echo htmlspecialchars($service['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_name" class="form-label">Nama Promo</label>
+                            <input type="text" class="form-control" id="edit_name" name="name" required>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-12">
+                            <label for="edit_description" class="form-label">Deskripsi Promo</label>
+                            <textarea class="form-control" id="edit_description" name="description" rows="2" required></textarea>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label for="edit_discount_type" class="form-label">Jenis Diskon</label>
+                            <select class="form-select" id="edit_discount_type" name="discount_type" required>
+                                <option value="percentage">Persentase (%)</option>
+                                <option value="fixed">Nominal (Rp)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="edit_discount_value" class="form-label">Nilai Diskon</label>
+                            <input type="number" class="form-control" id="edit_discount_value" name="discount_value" required min="0" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="edit_min_quantity" class="form-label">Minimal Quantity</label>
+                            <input type="number" class="form-control" id="edit_min_quantity" name="min_quantity" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="edit_start_date" class="form-label">Tanggal Mulai</label>
+                            <input type="date" class="form-control" id="edit_start_date" name="start_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_end_date" class="form-label">Tanggal Berakhir</label>
+                            <input type="date" class="form-control" id="edit_end_date" name="end_date">
+                        </div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="edit_is_active" name="is_active" value="1">
+                        <label class="form-check-label" for="edit_is_active">Aktif</label>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="update_promo" class="btn btn-primary">Update Promo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Add staggered animation for cards
-    document.addEventListener('DOMContentLoaded', function() {
-        const cards = document.querySelectorAll('.pricing-card[data-delay]');
-        
-        cards.forEach(card => {
-            const delay = card.getAttribute('data-delay');
-            setTimeout(() => {
-                card.style.opacity = '1';
-            }, parseInt(delay));
-        });
-        
-        // Add hover effect for promo cards
-        const promoCards = document.querySelectorAll('.promo-card');
-        promoCards.forEach(card => {
-            card.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateY(-10px) scale(1.02)';
-            });
-            card.addEventListener('mouseleave', function() {
-                this.style.transform = 'translateY(-10px) scale(1)';
-            });
-        });
-    });
-</script>
+    // Form validation (Bootstrap) for both add and edit forms
+    (function() {
+        'use strict'
+        var forms = document.querySelectorAll('.needs-validation')
+        Array.prototype.slice.call(forms)
+            .forEach(function(form) {
+                form.addEventListener('submit', function(event) {
+                    if (!form.checkValidity()) {
+                        event.preventDefault()
+                        event.stopPropagation()
+                    }
+                    form.classList.add('was-validated')
+                }, false)
+            })
+    })()
 
+    function editPromo(promo) {
+        document.getElementById('edit_id').value = promo.id;
+        document.getElementById('edit_service_id').value = promo.service_id || '';
+        document.getElementById('edit_name').value = promo.name;
+        document.getElementById('edit_description').value = promo.description;
+        document.getElementById('edit_discount_type').value = promo.discount_type;
+        document.getElementById('edit_discount_value').value = promo.discount_value;
+        document.getElementById('edit_min_quantity').value = promo.min_quantity;
+        document.getElementById('edit_start_date').value = promo.start_date || '';
+        document.getElementById('edit_end_date').value = promo.end_date || '';
+        document.getElementById('edit_is_active').checked = promo.is_active == 1;
+
+        // reset validation state
+        document.getElementById('promoForm').classList.remove('was-validated');
+
+        var modal = new bootstrap.Modal(document.getElementById('promoModal'));
+        modal.show();
+    }
+</script>
 </body>
+
 </html>
